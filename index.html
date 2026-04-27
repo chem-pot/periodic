@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주기율표 시뮬레이션</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #e0e0ff;
+            text-shadow: 0 0 20px rgba(100,150,255,0.5);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .legend-color {
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .table-wrapper { overflow-x: auto; padding-bottom: 10px; }
+
+        .periodic-table {
+            display: grid;
+            grid-template-columns: 36px repeat(18, 52px);
+            gap: 3px;
+            margin: 0 auto;
+            width: fit-content;
+        }
+
+        .period-label, .group-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #ccd;
+            font-weight: bold;
+            background: rgba(255,255,255,0.07);
+            border-radius: 4px;
+        }
+
+        .group-label { height: 28px; }
+        .period-label { height: 60px; }
+        .period-label.short { height: 28px; }
+
+        .element {
+            height: 60px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s, box-shadow 0.15s;
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 2px;
+        }
+
+        .element:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(255,255,255,0.6);
+            z-index: 10;
+            position: relative;
+        }
+
+        .element .num { font-size: 0.58rem; opacity: 0.85; align-self: flex-start; margin-left: 3px; }
+        .element .sym { font-size: 1.15rem; font-weight: bold; line-height: 1; }
+        .element .kor { font-size: 0.52rem; opacity: 0.9; margin-top: 1px; }
+        .element .mas { font-size: 0.48rem; opacity: 0.75; }
+
+        /* ===== 3가지 색상만 ===== */
+        .metal     { background: linear-gradient(135deg, #1a6eb5, #0d4a8a); }
+        .metalloid { background: linear-gradient(135deg, #8e44ad, #6c3483); }
+        .nonmetal  { background: linear-gradient(135deg, #1a9e6e, #0e6b4a); }
+
+        /* 모달 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: linear-gradient(135deg, #1e3a5f, #0d2137);
+            border: 2px solid rgba(100,150,255,0.4);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 440px;
+            width: 92%;
+            box-shadow: 0 0 40px rgba(50,100,255,0.3);
+            position: relative;
+            animation: pop 0.22s ease;
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.8); opacity: 0; }
+            to   { transform: scale(1);   opacity: 1; }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 12px; right: 16px;
+            background: none; border: none;
+            color: white; font-size: 1.5rem;
+            cursor: pointer; opacity: 0.7;
+        }
+        .modal-close:hover { opacity: 1; }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+
+        .modal-symbol-box {
+            width: 82px; height: 82px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255,255,255,0.3);
+            flex-shrink: 0;
+        }
+
+        .modal-symbol-box .m-num { font-size: 0.78rem; margin-bottom: 2px; opacity:0.85; }
+        .modal-symbol-box .m-sym { font-size: 2.2rem; font-weight: bold; line-height: 1; }
+
+        .modal-title h2 { font-size: 1.45rem; color: #e0e8ff; }
+        .modal-title .m-kr { font-size: 1rem; color: #aac; margin-top: 3px; }
+        .modal-title .m-type { font-size: 0.8rem; margin-top: 6px; padding: 3px 10px; border-radius: 20px; display: inline-block; font-weight: bold; }
+
+        .type-metal    { background: rgba(26,110,181,0.5); color:#7fc8ff; }
+        .type-metalloid{ background: rgba(142,68,173,0.5); color:#d7a8f5; }
+        .type-nonmetal { background: rgba(26,158,110,0.5); color:#7febb0; }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .info-card {
+            background: rgba(255,255,255,0.07);
+            border-radius: 8px;
+            padding: 9px 13px;
+        }
+        .info-card .lbl { font-size: 0.68rem; color: #99aacc; margin-bottom: 3px; }
+        .info-card .val { font-size: 0.95rem; font-weight: bold; color: #ddeeff; }
+
+        .placeholder {
+            height: 60px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.55rem;
+            text-align: center;
+            opacity: 0.55;
+            border: 1px dashed rgba(255,255,255,0.3);
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<h1>⚗️ 주기율표 시뮬레이션</h1>
+
+<div class="legend">
+    <div class="legend-item">
+        <div class="legend-color metal"></div> 금속 원소
+    </div>
+    <div class="legend-item">
+        <div class="legend-color metalloid"></div> 준금속 원소
+    </div>
+    <div class="legend-item">
+        <div class="legend-color nonmetal"></div> 비금속 원소
+    </div>
+</div>
+
+<div class="table-wrapper">
+    <div class="periodic-table" id="periodicTable"></div>
+</div>
+
+<!-- 모달 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <button class="modal-close" onclick="closeModalBtn()">✕</button>
+        <div class="modal-header">
+            <div class="modal-symbol-box" id="mSymBox">
+                <div class="m-num" id="mNum"></div>
+                <div class="m-sym" id="mSym"></div>
+            </div>
+            <div class="modal-title">
+                <h2 id="mNameEn"></h2>
+                <div class="m-kr" id="mNameKr"></div>
+                <div class="m-type" id="mType"></div>
+            </div>
+        </div>
+        <div class="info-grid">
+            <div class="info-card"><div class="lbl">⚖️ 원자량</div><div class="val" id="mMass"></div></div>
+            <div class="info-card"><div class="lbl">📍 주기 / 족</div><div class="val" id="mPG"></div></div>
+            <div class="info-card"><div class="lbl">⚡ 전자 배치</div><div class="val" id="mConfig"></div></div>
+            <div class="info-card"><div class="lbl">🌡️ 상온 상태</div><div class="val" id="mState"></div></div>
+            <div class="info-card"><div class="lbl">🔥 끓는점</div><div class="val" id="mBoil"></div></div>
+            <div class="info-card"><div class="lbl">❄️ 녹는점</div><div class="val" id="mMelt"></div></div>
+            <div class="info-card"><div class="lbl">🔋 전기음성도</div><div class="val" id="mEneg"></div></div>
+            <div class="info-card"><div class="lbl">📅 발견 연도</div><div class="val" id="mYear"></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// category: 'metal' | 'metalloid' | 'nonmetal'
+const elements = [
+  { z:1,   sym:'H',  en:'Hydrogen',      kr:'수소',        mass:1.008,   period:1, group:1,   cat:'nonmetal',  state:'기체', melt:-259.1, boil:-252.9, eneg:2.20, config:'1s¹',                year:1766 },
+  { z:2,   sym:'He', en:'Helium',        kr:'헬륨',        mass:4.003,   period:1, group:18,  cat:'nonmetal',  state:'기체', melt:-272.2, boil:-268.9, eneg:'-',  config:'1s²',                year:1868 },
+  { z:3,   sym:'Li', en:'Lithium',       kr:'리튬',        mass:6.941,   period:2, group:1,   cat:'metal',     state:'고체', melt:180.5,  boil:1342,   eneg:0.98, config:'[He]2s¹',            year:1817 },
+  { z:4,   sym:'Be', en:'Beryllium',     kr:'베릴륨',      mass:9.012,   period:2, group:2,   cat:'metal',     state:'고체', melt:1287,   boil:2469,   eneg:1.57, config:'[He]2s²',            year:1798 },
+  { z:5,   sym:'B',  en:'Boron',         kr:'붕소',        mass:10.811,  period:2, group:13,  cat:'metalloid', state:'고체', melt:2075,   boil:4000,   eneg:2.04, config:'[He]2s²2p¹',         year:1808 },
+  { z:6,   sym:'C',  en:'Carbon',        kr:'탄소',        mass:12.011,  period:2, group:14,  cat:'nonmetal',  state:'고체', melt:3550,   boil:4027,   eneg:2.55, config:'[He]2s²2p²',         year:'고대' },
+  { z:7,   sym:'N',  en:'Nitrogen',      kr:'질소',        mass:14.007,  period:2, group:15,  cat:'nonmetal',  state:'기체', melt:-210,   boil:-195.8, eneg:3.04, config:'[He]2s²2p³',         year:1772 },
+  { z:8,   sym:'O',  en:'Oxygen',        kr:'산소',        mass:15.999,  period:2, group:16,  cat:'nonmetal',  state:'기체', melt:-218.8, boil:-183,   eneg:3.44, config:'[He]2s²2p⁴',         year:1774 },
+  { z:9,   sym:'F',  en:'Fluorine',      kr:'플루오린',    mass:18.998,  period:2, group:17,  cat:'nonmetal',  state:'기체', melt:-219.6, boil:-188.1, eneg:3.98, config:'[He]2s²2p⁵',         year:1886 },
+  { z:10,  sym:'Ne', en:'Neon',          kr:'네온',        mass:20.180,  period:2, group:18,  cat:'nonmetal',  state:'기체', melt:-248.6, boil:-246.1, eneg:'-',  config:'[He]2s²2p⁶',         year:1898 },
+  { z:11,  sym:'Na', en:'Sodium',        kr:'나트륨',      mass:22.990,  period:3, group:1,   cat:'metal',     state:'고체', melt:97.8,   boil:883,    eneg:0.93, config:'[Ne]3s¹',            year:1807 },
+  { z:12,  sym:'Mg', en:'Magnesium',     kr:'마그네슘',    mass:24.305,  period:3, group:2,   cat:'metal',     state:'고체', melt:650,    boil:1090,   eneg:1.31, config:'[Ne]3s²',            year:1755 },
+  { z:13,  sym:'Al', en:'Aluminium',     kr:'알루미늄',    mass:26.982,  period:3, group:13,  cat:'metal',     state:'고체', melt:660.3,  boil:2519,   eneg:1.61, config:'[Ne]3s²3p¹',         year:1825 },
+  { z:14,  sym:'Si', en:'Silicon',       kr:'규소',        mass:28.086,  period:3, group:14,  cat:'metalloid', state:'고체', melt:1414,   boil:2900,   eneg:1.90, config:'[Ne]3s²3p²',         year:1824 },
+  { z:15,  sym:'P',  en:'Phosphorus',    kr:'인',          mass:30.974,  period:3, group:15,  cat:'nonmetal',  state:'고체', melt:44.2,   boil:280.5,  eneg:2.19, config:'[Ne]3s²3p³',         year:1669 },
+  { z:16,  sym:'S',  en:'Sulfur',        kr:'황',          mass:32.065,  period:3, group:16,  cat:'nonmetal',  state:'고체', melt:115.2,  boil:444.7,  eneg:2.58, config:'[Ne]3s²3p⁴',         year:'고대' },
+  { z:17,  sym:'Cl', en:'Chlorine',      kr:'염소',        mass:35.453,  period:3, group:17,  cat:'nonmetal',  state:'기체', melt:-101.5, boil:-34.1,  eneg:3.16, config:'[Ne]3s²3p⁵',         year:1774 },
+  { z:18,  sym:'Ar', en:'Argon',         kr:'아르곤',      mass:39.948,  period:3, group:18,  cat:'nonmetal',  state:'기체', melt:-189.4, boil:-185.8, eneg:'-',  config:'[Ne]3s²3p⁶',         year:1894 },
+  { z:19,  sym:'K',  en:'Potassium',     kr:'칼륨',        mass:39.098,  period:4, group:1,   cat:'metal',     state:'고체', melt:63.4,   boil:759,    eneg:0.82, config:'[Ar]4s¹',            year:1807 },
+  { z:20,  sym:'Ca', en:'Calcium',       kr:'칼슘',        mass:40.078,  period:4, group:2,   cat:'metal',     state:'고체', melt:842,    boil:1484,   eneg:1.00, config:'[Ar]4s²',            year:1808 },
+  { z:21,  sym:'Sc', en:'Scandium',      kr:'스칸듐',      mass:44.956,  period:4, group:3,   cat:'metal',     state:'고체', melt:1541,   boil:2836,   eneg:1.36, config:'[Ar]3d¹4s²',         year:1879 },
+  { z:22,  sym:'Ti', en:'Titanium',      kr:'타이타늄',    mass:47.867,  period:4, group:4,   cat:'metal',     state:'고체', melt:1668,   boil:3287,   eneg:1.54, config:'[Ar]3d²4s²',         year:1791 },
+  { z:23,  sym:'V',  en:'Vanadium',      kr:'바나듐',      mass:50.942,  period:4, group:5,   cat:'metal',     state:'고체', melt:1910,   boil:3407,   eneg:1.63, config:'[Ar]3d³4s²',         year:1801 },
+  { z:24,  sym:'Cr', en:'Chromium',      kr:'크로뮴',      mass:51.996,  period:4, group:6,   cat:'metal',     state:'고체', melt:1907,   boil:2671,   eneg:1.66, config:'[Ar]3d⁵4s¹',         year:1798 },
+  { z:25,  sym:'Mn', en:'Manganese',     kr:'망가니즈',    mass:54.938,  period:4, group:7,   cat:'metal',     state:'고체', melt:1246,   boil:2061,   eneg:1.55, config:'[Ar]3d⁵4s²',         year:1774 },
+  { z:26,  sym:'Fe', en:'Iron',          kr:'철',          mass:55.845,  period:4, group:8,   cat:'metal',     state:'고체', melt:1538,   boil:2861,   eneg:1.83, config:'[Ar]3d⁶4s²',         year:'고대' },
+  { z:27,  sym:'Co', en:'Cobalt',        kr:'코발트',      mass:58.933,  period:4, group:9,   cat:'metal',     state:'고체', melt:1495,   boil:2927,   eneg:1.88, config:'[Ar]3d⁷4s²',         year:1735 },
+  { z:28,  sym:'Ni', en:'Nickel',        kr:'니켈',        mass:58.693,  period:4, group:10,  cat:'metal',     state:'고체', melt:1455,   boil:2913,   eneg:1.91, config:'[Ar]3d⁸4s²',         year:1751 },
+  { z:29,  sym:'Cu', en:'Copper',        kr:'구리',        mass:63.546,  period:4, group:11,  cat:'metal',     state:'고체', melt:1085,   boil:2562,   eneg:1.90, config:'[Ar]3d¹⁰4s¹',        year:'고대' },
+  { z:30,  sym:'Zn', en:'Zinc',          kr:'아연',        mass:65.38,   period:4, group:12,  cat:'metal',     state:'고체', melt:419.5,  boil:907,    eneg:1.65, config:'[Ar]3d¹⁰4s²',        year:1746 },
+  { z:31,  sym:'Ga', en:'Gallium',       kr:'갈륨',        mass:69.723,  period:4, group:13,  cat:'metal',     state:'고체', melt:29.8,   boil:2204,   eneg:1.81, config:'[Ar]3d¹⁰4s²4p¹',     year:1875 },
+  { z:32,  sym:'Ge', en:'Germanium',     kr:'저마늄',      mass:72.630,  period:4, group:14,  cat:'metalloid', state:'고체', melt:938.3,  boil:2820,   eneg:2.01, config:'[Ar]3d¹⁰4s²4p²',     year:1886 },
+  { z:33,  sym:'As', en:'Arsenic',       kr:'비소',        mass:74.922,  period:4, group:15,  cat:'metalloid', state:'고체', melt:817,    boil:614,    eneg:2.18, config:'[Ar]3d¹⁰4s²4p³',     year:'고대' },
+  { z:34,  sym:'Se', en:'Selenium',      kr:'셀레늄',      mass:78.971,  period:4, group:16,  cat:'nonmetal',  state:'고체', melt:221,    boil:685,    eneg:2.55, config:'[Ar]3d¹⁰4s²4p⁴',     year:1817 },
+  { z:35,  sym:'Br', en:'Bromine',       kr:'브로민',      mass:79.904,  period:4, group:17,  cat:'nonmetal',  state:'액체', melt:-7.3,   boil:59.0,   eneg:2.96, config:'[Ar]3d¹⁰4s²4p⁵',     year:1826 },
+  { z:36,  sym:'Kr', en:'Krypton',       kr:'크립톤',      mass:83.798,  period:4, group:18,  cat:'nonmetal',  state:'기체', melt:-157.4, boil:-153.2, eneg:3.00, config:'[Ar]3d¹⁰4s²4p⁶',     year:1898 },
+  { z:37,  sym:'Rb', en:'Rubidium',      kr:'루비듐',      mass:85.468,  period:5, group:1,   cat:'metal',     state:'고체', melt:39.3,   boil:688,    eneg:0.82, config:'[Kr]5s¹',            year:1861 },
+  { z:38,  sym:'Sr', en:'Strontium',     kr:'스트론튬',    mass:87.62,   period:5, group:2,   cat:'metal',     state:'고체', melt:777,    boil:1382,   eneg:0.95, config:'[Kr]5s²',            year:1790 },
+  { z:39,  sym:'Y',  en:'Yttrium',       kr:'이트륨',      mass:88.906,  period:5, group:3,   cat:'metal',     state:'고체', melt:1522,   boil:3345,   eneg:1.22, config:'[Kr]4d¹5s²',         year:1794 },
+  { z:40,  sym:'Zr', en:'Zirconium',     kr:'지르코늄',    mass:91.224,  period:5, group:4,   cat:'metal',     state:'고체', melt:1855,   boil:4409,   eneg:1.33, config:'[Kr]4d²5s²',         year:1789 },
+  { z:41,  sym:'Nb', en:'Niobium',       kr:'나이오븀',    mass:92.906,  period:5, group:5,   cat:'metal',     state:'고체', melt:2477,   boil:4744,   eneg:1.60, config:'[Kr]4d⁴5s¹',         year:1801 },
+  { z:42,  sym:'Mo', en:'Molybdenum',    kr:'몰리브덴',    mass:95.96,   period:5, group:6,   cat:'metal',     state:'고체', melt:2623,   boil:4639,   eneg:2.16, config:'[Kr]4d⁵5s¹',         year:1781 },
+  { z:43,  sym:'Tc', en:'Technetium',    kr:'테크네튬',    mass:98,      period:5, group:7,   cat:'metal',     state:'고체', melt:2157,   boil:4265,   eneg:1.90, config:'[Kr]4d⁵5s²',         year:1937 },
+  { z:44,  sym:'Ru', en:'Ruthenium',     kr:'루테늄',      mass:101.07,  period:5, group:8,   cat:'metal',     state:'고체', melt:2334,   boil:4150,   eneg:2.20, config:'[Kr]4d⁷5s¹',         year:1844 },
+  { z:45,  sym:'Rh', en:'Rhodium',       kr:'로듐',        mass:102.91,  period:5, group:9,   cat:'metal',     state:'고체', melt:1964,   boil:3695,   eneg:2.28, config:'[Kr]4d⁸5s¹',         year:1803 },
+  { z:46,  sym:'Pd', en:'Palladium',     kr:'팔라듐',      mass:106.42,  period:5, group:10,  cat:'metal',     state:'고체', melt:1555,   boil:2963,   eneg:2.20, config:'[Kr]4d¹⁰',           year:1803 },
+  { z:47,  sym:'Ag', en:'Silver',        kr:'은',          mass:107.87,  period:5, group:11,  cat:'metal',     state:'고체', melt:961.8,  boil:2162,   eneg:1.93, config:'[Kr]4d¹⁰5s¹',        year:'고대' },
+  { z:48,  sym:'Cd', en:'Cadmium',       kr:'카드뮴',      mass:112.41,  period:5, group:12,  cat:'metal',     state:'고체', melt:321.1,  boil:767,    eneg:1.69, config:'[Kr]4d¹⁰5s²',        year:1817 },
+  { z:49,  sym:'In', en:'Indium',        kr:'인듐',        mass:114.82,  period:5, group:13,  cat:'metal',     state:'고체', melt:156.6,  boil:2072,   eneg:1.78, config:'[Kr]4d¹⁰5s²5p¹',     year:1863 },
+  { z:50,  sym:'Sn', en:'Tin',           kr:'주석',        mass:118.71,  period:5, group:14,  cat:'metal',     state:'고체', melt:231.9,  boil:2602,   eneg:1.96, config:'[Kr]4d¹⁰5s²5p²',     year:'고대' },
+  { z:51,  sym:'Sb', en:'Antimony',      kr:'안티모니',    mass:121.76,  period:5, group:15,  cat:'metalloid', state:'고체', melt:630.6,  boil:1587,   eneg:2.05, config:'[Kr]4d¹⁰5s²5p³',     year:'고대' },
+  { z:52,  sym:'Te', en:'Tellurium',     kr:'텔루륨',      mass:127.60,  period:5, group:16,  cat:'metalloid', state:'고체', melt:449.5,  boil:988,    eneg:2.10, config:'[Kr]4d¹⁰5s²5p⁴',     year:1782 },
+  { z:53,  sym:'I',  en:'Iodine',        kr:'아이오딘',    mass:126.90,  period:5, group:17,  cat:'nonmetal',  state:'고체', melt:113.5,  boil:184.3,  eneg:2.66, config:'[Kr]4d¹⁰5s²5p⁵',     year:1811 },
+  { z:54,  sym:'Xe', en:'Xenon',         kr:'제논',        mass:131.29,  period:5, group:18,  cat:'nonmetal',  state:'기체', melt:-111.8, boil:-108.0, eneg:2.60, config:'[Kr]4d¹⁰5s²5p⁶',     year:1898 },
+  { z:55,  sym:'Cs', en:'Caesium',       kr:'세슘',        mass:132.91,  period:6, group:1,   cat:'metal',     state:'고체', melt:28.5,   boil:671,    eneg:0.79, config:'[Xe]6s¹',            year:1860 },
+  { z:56,  sym:'Ba', en:'Barium',        kr:'바륨',        mass:137.33,  period:6, group:2,   cat:'metal',     state:'고체', melt:727,    boil:1897,   eneg:0.89, config:'[Xe]6s²',            year:1808 },
+  { z:57,  sym:'La', en:'Lanthanum',     kr:'란타넘',      mass:138.91,  period:6, group:'란', cat:'metal',    state:'고체', melt:920,    boil:3464,   eneg:1.10, config:'[Xe]5d¹6s²',         year:1839 },
+  { z:58,  sym:'Ce', en:'Cerium',        kr:'세륨',        mass:140.12,  period:6, group:'란', cat:'metal',    state:'고체', melt:795,    boil:3443,   eneg:1.12, config:'[Xe]4f¹5d¹6s²',      year:1803 },
+  { z:59,  sym:'Pr', en:'Praseodymium',  kr:'프라세오디뮴',mass:140.91,  period:6, group:'란', cat:'metal',    state:'고체', melt:935,    boil:3520,   eneg:1.13, config:'[Xe]4f³6s²',         year:1885 },
+  { z:60,  sym:'Nd', en:'Neodymium',     kr:'네오디뮴',    mass:144.24,  period:6, group:'란', cat:'metal',    state:'고체', melt:1024,   boil:3074,   eneg:1.14, config:'[Xe]4f⁴6s²',         year:1885 },
+  { z:61,  sym:'Pm', en:'Promethium',    kr:'프로메튬',    mass:145,     period:6, group:'란', cat:'metal',    state:'고체', melt:1100,   boil:3000,   eneg:1.13, config:'[Xe]4f⁵6s²',         year:1945 },
+  { z:62,  sym:'Sm', en:'Samarium',      kr:'사마륨',      mass:150.36,  period:6, group:'란', cat:'metal',    state:'고체', melt:1072,   boil:1794,   eneg:1.17, config:'[Xe]4f⁶6s²',         year:1879 },
+  { z:63,  sym:'Eu', en:'Europium',      kr:'유로퓸',      mass:151.96,  period:6, group:'란', cat:'metal',    state:'고체', melt:826,    boil:1529,   eneg:1.20, config:'[Xe]4f⁷6s²',         year:1901 },
+  { z:64,  sym:'Gd', en:'Gadolinium',    kr:'가돌리늄',    mass:157.25,  period:6, group:'란', cat:'metal',    state:'고체', melt:1313,   boil:3273,   eneg:1.20, config:'[Xe]4f⁷5d¹6s²',      year:1880 },
+  { z:65,  sym:'Tb', en:'Terbium',       kr:'터븀',        mass:158.93,  period:6, group:'란', cat:'metal',    state:'고체', melt:1356,   boil:3230,   eneg:1.10, config:'[Xe]4f⁹6s²',         year:1843 },
+  { z:66,  sym:'Dy', en:'Dysprosium',    kr:'디스프로슘',  mass:162.50,  period:6, group:'란', cat:'metal',    state:'고체', melt:1407,   boil:2562,   eneg:1.22, config:'[Xe]4f¹⁰6s²',        year:1886 },
+  { z:67,  sym:'Ho', en:'Holmium',       kr:'홀뮴',        mass:164.93,  period:6, group:'란', cat:'metal',    state:'고체', melt:1461,   boil:2720,   eneg:1.23, config:'[Xe]4f¹¹6s²',        year:1878 },
+  { z:68,  sym:'Er', en:'Erbium',        kr:'어븀',        mass:167.26,  period:6, group:'란', cat:'metal',    state:'고체', melt:1529,   boil:2868,   eneg:1.24, config:'[Xe]4f¹²6s²',        year:1843 },
+  { z:69,  sym:'Tm', en:'Thulium',       kr:'툴륨',        mass:168.93,  period:6, group:'란', cat:'metal',    state:'고체', melt:1545,   boil:1950,   eneg:1.25, config:'[Xe]4f¹³6s²',        year:1879 },
+  { z:70,  sym:'Yb', en:'Ytterbium',     kr:'이터븀',      mass:173.04,  period:6, group:'란', cat:'metal',    state:'고체', melt:824,    boil:1196,   eneg:1.10, config:'[Xe]4f¹⁴6s²',        year:1878 },
+  { z:71,  sym:'Lu', en:'Lutetium',      kr:'루테튬',      mass:174.97,  period:6, group:'란', cat:'metal',    state:'고체', melt:1652,   boil:3402,   eneg:1.27, config:'[Xe]4f¹⁴5d¹6s²',     year:1907 },
+  { z:72,  sym:'Hf', en:'Hafnium',       kr:'하프늄',      mass:178.49,  period:6, group:4,   cat:'metal',     state:'고체', melt:2233,   boil:4603,   eneg:1.30, config:'[Xe]4f¹⁴5d²6s²',     year:1923 },
+  { z:73,  sym:'Ta', en:'Tantalum',      kr:'탄탈럼',      mass:180.95,  period:6, group:5,   cat:'metal',     state:'고체', melt:3017,   boil:5458,   eneg:1.50, config:'[Xe]4f¹⁴5d³6s²',     year:1802 },
+  { z:74,  sym:'W',  en:'Tungsten',      kr:'텅스텐',      mass:183.84,  period:6, group:6,   cat:'metal',     state:'고체', melt:3422,   boil:5555,   eneg:2.36, config:'[Xe]4f¹⁴5d⁴6s²',     year:1783 },
+  { z:75,  sym:'Re', en:'Rhenium',       kr:'레늄',        mass:186.21,  period:6, group:7,   cat:'metal',     state:'고체', melt:3186,   boil:5596,   eneg:1.90, config:'[Xe]4f¹⁴5d⁵6s²',     year:1925 },
+  { z:76,  sym:'Os', en:'Osmium',        kr:'오스뮴',      mass:190.23,  period:6, group:8,   cat:'metal',     state:'고체', melt:3033,   boil:5012,   eneg:2.20, config:'[Xe]4f¹⁴5d⁶6s²',     year:1803 },
+  { z:77,  sym:'Ir', en:'Iridium',       kr:'이리듐',      mass:192.22,  period:6, group:9,   cat:'metal',     state:'고체', melt:2446,   boil:4428,   eneg:2.20, config:'[Xe]4f¹⁴5d⁷6s²',     year:1803 },
+  { z:78,  sym:'Pt', en:'Platinum',      kr:'백금',        mass:195.08,  period:6, group:10,  cat:'metal',     state:'고체', melt:1768,   boil:3825,   eneg:2.28, config:'[Xe]4f¹⁴5d⁹6s¹',     year:1735 },
+  { z:79,  sym:'Au', en:'Gold',          kr:'금',          mass:196.97,  period:6, group:11,  cat:'metal',     state:'고체', melt:1064,   boil:2856,   eneg:2.54, config:'[Xe]4f¹⁴5d¹⁰6s¹',    year:'고대' },
+  { z:80,  sym:'Hg', en:'Mercury',       kr:'수은',        mass:200.59,  period:6, group:12,  cat:'metal',     state:'액체', melt:-38.8,  boil:356.7,  eneg:2.00, config:'[Xe]4f¹⁴5d¹⁰6s²',    year:'고대' },
+  { z:81,  sym:'Tl', en:'Thallium',      kr:'탈륨',        mass:204.38,  period:6, group:13,  cat:'metal',     state:'고체', melt:304,    boil:1473,   eneg:2.04, config:'[Xe]4f¹⁴5d¹⁰6s²6p¹', year:1861 },
+  { z:82,  sym:'Pb', en:'Lead',          kr:'납',          mass:207.2,   period:6, group:14,  cat:'metal',     state:'고체', melt:327.5,  boil:1749,   eneg:2.33, config:'[Xe]4f¹⁴5d¹⁰6s²6p²', year:'고대' },
+  { z:83,  sym:'Bi', en:'Bismuth',       kr:'비스무트',    mass:208.98,  period:6, group:15,  cat:'metal',     state:'고체', melt:271.4,  boil:1564,   eneg:2.02, config:'[Xe]4f¹⁴5d¹⁰6s²6p³', year:1753 },
+  { z:84,  sym:'Po', en:'Polonium',      kr:'폴로늄',      mass:209,     period:6, group:16,  cat:'metalloid', state:'고체', melt:254,    boil:962,    eneg:2.00, config:'[Xe]4f¹⁴5d¹⁰6s²6p⁴', year:1898 },
+  { z:85,  sym:'At', en:'Astatine',      kr:'아스타틴',    mass:210,     period:6, group:17,  cat:'metalloid', state:'고체', melt:302,    boil:337,    eneg:2.20, config:'[Xe]4f¹⁴5d¹⁰6s²6p⁵', year:1940 },
+  { z:86,  sym:'Rn', en:'Radon',         kr:'라돈',        mass:222,     period:6, group:18,  cat:'nonmetal',  state:'기체', melt:-71,    boil:-61.7,  eneg:'-',  config:'[Xe]4f¹⁴5d¹⁰6s²6p⁶', year:1900 },
+  { z:87,  sym:'Fr', en:'Francium',      kr:'프랑슘',      mass:223,     period:7, group:1,   cat:'metal',     state:'고체', melt:27,     boil:677,    eneg:0.70, config:'[Rn]7s¹',            year:1939 },
+  { z:88,  sym:'Ra', en:'Radium',        kr:'라듐',        mass:226,     period:7, group:2,   cat:'metal',     state:'고체', melt:700,    boil:1737,   eneg:0.90, config:'[Rn]7s²',            year:1898 },
+  { z:89,  sym:'Ac', en:'Actinium',      kr:'악티늄',      mass:227,     period:7, group:'악', cat:'metal',    state:'고체', melt:1051,   boil:3198,   eneg:1.10, config:'[Rn]6d¹7s²',         year:1899 },
+  { z:90,  sym:'Th', en:'Thorium',       kr:'토륨',        mass:232.04,  period:7, group:'악', cat:'metal',    state:'고체', melt:1750,   boil:4788,   eneg:1.30, config:'[Rn]6d²7s²',         year:1829 },
+  { z:91,  sym:'Pa', en:'Protactinium',  kr:'프로탁티늄',  mass:231.04,  period:7, group:'악', cat:'metal',    state:'고체', melt:1568,   boil:4027,   eneg:1.50, config:'[Rn]5f²6d¹7s²',      year:1913 },
+  { z:92,  sym:'U',  en:'Uranium',       kr:'우라늄',      mass:238.03,  period:7, group:'악', cat:'metal',    state:'고체', melt:1135,   boil:4131,   eneg:1.38, config:'[Rn]5f³6d¹7s²',      year:1789 },
+  { z:93,  sym:'Np', en:'Neptunium',     kr:'넵투늄',      mass:237,     period:7, group:'악', cat:'metal',    state:'고체', melt:644,    boil:4000,   eneg:1.36, config:'[Rn]5f⁴6d¹7s²',      year:1940 },
+  { z:94,  sym:'Pu', en:'Plutonium',     kr:'플루토늄',    mass:244,     period:7, group:'악', cat:'metal',    state:'고체', melt:640,    boil:3228,   eneg:1.28, config:'[Rn]5f⁶7s²',         year:1940 },
+  { z:95,  sym:'Am', en:'Americium',     kr:'아메리슘',    mass:243,     period:7, group:'악', cat:'metal',    state:'고체', melt:1176,   boil:2011,   eneg:1.30, config:'[Rn]5f⁷7s²',         year:1944 },
+  { z:96,  sym:'Cm', en:'Curium',        kr:'퀴륨',        mass:247,     period:7, group:'악', cat:'metal',    state:'고체', melt:1340,   boil:3110,   eneg:1.30, config:'[Rn]5f⁷6d¹7s²',      year:1944 },
+  { z:97,  sym:'Bk', en:'Berkelium',     kr:'버클륨',      mass:247,     period:7, group:'악', cat:'metal',    state:'고체', melt:1050,   boil:'-',    eneg:1.30, config:'[Rn]5f⁹7s²',         year:1949 },
+  { z:98,  sym:'Cf', en:'Californium',   kr:'캘리포늄',    mass:251,     period:7, group:'악', cat:'metal',    state:'고체', melt:900,    boil:'-',    eneg:1.30, config:'[Rn]5f¹⁰7s²',        year:1950 },
+  { z:99,  sym:'Es', en:'Einsteinium',   kr:'아인슈타이늄',mass:252,     period:7, group:'악', cat:'metal',    state:'고체', melt:860,    boil:'-',    eneg:1.30, config:'[Rn]5f¹¹7s²',        year:1952 },
+  { z:100, sym:'Fm', en:'Fermium',       kr:'페르뮴',      mass:257,     period:7, group:'악', cat:'metal',    state:'고체', melt:1527,   boil:'-',    eneg:1.30, config:'[Rn]5f¹²7s²',        year:1952 },
+  { z:101, sym:'Md', en:'Mendelevium',   kr:'멘델레븀',    mass:258,     period:7, group:'악', cat:'metal',    state:'고체', melt:827,    boil:'-',    eneg:1.30, config:'[Rn]5f¹³7s²',        year:1955 },
+  { z:102, sym:'No', en:'Nobelium',      kr:'노벨륨',      mass:259,     period:7, group:'악', cat:'metal',    state:'고체', melt:827,    boil:'-',    eneg:1.30, config:'[Rn]5f¹⁴7s²',        year:1958 },
+  { z:103, sym:'Lr', en:'Lawrencium',    kr:'로렌슘',      mass:262,     period:7, group:'악', cat:'metal',    state:'고체', melt:1627,   boil:'-',    eneg:1.30, config:'[Rn]5f¹⁴7s²7p¹',     year:1961 },
+  { z:104, sym:'Rf', en:'Rutherfordium', kr:'러더포듐',    mass:267,     period:7, group:4,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d²7s²',     year:1964 },
+  { z:105, sym:'Db', en:'Dubnium',       kr:'더브늄',      mass:270,     period:7, group:5,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d³7s²',     year:1970 },
+  { z:106, sym:'Sg', en:'Seaborgium',    kr:'시보귬',      mass:271,     period:7, group:6,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁴7s²',     year:1974 },
+  { z:107, sym:'Bh', en:'Bohrium',       kr:'보륨',        mass:270,     period:7, group:7,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁵7s²',     year:1981 },
+  { z:108, sym:'Hs', en:'Hassium',       kr:'하슘',        mass:277,     period:7, group:8,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁶7s²',     year:1984 },
+  { z:109, sym:'Mt', en:'Meitnerium',    kr:'마이트너륨',  mass:276,     period:7, group:9,   cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁷7s²',     year:1982 },
+  { z:110, sym:'Ds', en:'Darmstadtium',  kr:'다름슈타튬',  mass:281,     period:7, group:10,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁸7s²',     year:1994 },
+  { z:111, sym:'Rg', en:'Roentgenium',   kr:'뢴트게늄',    mass:280,     period:7, group:11,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d⁹7s²',     year:1994 },
+  { z:112, sym:'Cn', en:'Copernicium',   kr:'코페르니슘',  mass:285,     period:7, group:12,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²',    year:1996 },
+  { z:113, sym:'Nh', en:'Nihonium',      kr:'니호늄',      mass:284,     period:7, group:13,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p¹', year:2004 },
+  { z:114, sym:'Fl', en:'Flerovium',     kr:'플레로븀',    mass:289,     period:7, group:14,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p²', year:1998 },
+  { z:115, sym:'Mc', en:'Moscovium',     kr:'모스코븀',    mass:288,     period:7, group:15,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p³', year:2003 },
+  { z:116, sym:'Lv', en:'Livermorium',   kr:'리버모륨',    mass:293,     period:7, group:16,  cat:'metal',     state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p⁴', year:2000 },
+  { z:117, sym:'Ts', en:'Tennessine',    kr:'테네신',      mass:294,     period:7, group:17,  cat:'nonmetal',  state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p⁵', year:2010 },
+  { z:118, sym:'Og', en:'Oganesson',     kr:'오가네손',    mass:294,     period:7, group:18,  cat:'nonmetal',  state:'?',   melt:'-',    boil:'-',    eneg:'-',  config:'[Rn]5f¹⁴6d¹⁰7s²7p⁶', year:2002 },
+];
+
+const catLabel = {
+    metal:     '금속 원소',
+    metalloid: '준금속 원소',
+    nonmetal:  '비금속 원소',
+};
+const catTypeClass = {
+    metal:     'type-metal',
+    metalloid: 'type-metalloid',
+    nonmetal:  'type-nonmetal',
+};
+
+// 그리드 위치 계산
+// 전체 그리드: 19열(라벨+18족) x 13행(족라벨+7주기+빈행+란타+악티)
+function getPos(el) {
+    const { period, group } = el;
+    if (typeof group === 'number') {
+        return { row: period + 1, col: group + 1 };
+    } else if (group === '란') {
+        return { row: 11, col: el.z - 57 + 4 };
+    } else {
+        return { row: 12, col: el.z - 89 + 4 };
+    }
+}
+
+function buildTable() {
+    const table = document.getElementById('periodicTable');
+    // 13행: 1=족라벨, 2~8=주기1~7, 9=빈행, 10=란타넘족 라벨행, 11=란타넘, 12=악티늄
+    table.style.gridTemplateRows =
+        '28px repeat(7,60px) 14px 28px 60px 60px';
+
+    // ── 족 라벨 (1행) ──
+    const corner = document.createElement('div');
+    corner.style.gridColumn = '1';
+    corner.style.gridRow = '1';
+    table.appendChild(corner);
+
+    for (let g = 1; g <= 18; g++) {
+        const lbl = document.createElement('div');
+        lbl.className = 'group-label';
+        lbl.textContent = g + '족';
+        lbl.style.gridColumn = g + 1;
+        lbl.style.gridRow = '1';
+        table.appendChild(lbl);
+    }
+
+    // ── 주기 라벨 (2~8행) ──
+    for (let p = 1; p <= 7; p++) {
+        const lbl = document.createElement('div');
+        lbl.className = 'period-label';
+        lbl.textContent = p + '주기';
+        lbl.style.gridColumn = '1';
+        lbl.style.gridRow = p + 1;
+        table.appendChild(lbl);
+    }
+
+    // ── 빈 구분행 (9행) 아무것도 안 넣음 ──
+
+    // ── 란타넘족 / 악티늄족 행 제목 (10행) ──
+    const lanTitleCell = document.createElement('div');
+    lanTitleCell.style.gridColumn = '1 / 4';
+    lanTitleCell.style.gridRow = '10';
+    lanTitleCell.style.display = 'flex';
+    lanTitleCell.style.alignItems = 'center';
+    lanTitleCell.style.justifyContent = 'flex-end';
+    lanTitleCell.style.paddingRight = '6px';
+    lanTitleCell.style.gap = '0';
+    lanTitleCell.innerHTML = `
+        <div style="font-size:0.62rem;color:#aac;text-align:right;line-height:1.5;">
+            <div style="color:#7fc8ff;">▶ 란타넘족 (6주기)</div>
+            <div style="color:#7febb0;">▶ 악티늄족 (7주기)</div>
+        </div>`;
+    table.appendChild(lanTitleCell);
+
+    // 란타넘족 라벨(10행) 족 번호
+    for (let i = 0; i < 15; i++) {
+        const lbl = document.createElement('div');
+        lbl.style.gridColumn = i + 4;
+        lbl.style.gridRow = '10';
+        lbl.style.display = 'flex';
+        lbl.style.alignItems = 'center';
+        lbl.style.justifyContent = 'center';
+        lbl.style.fontSize = '0.58rem';
+        lbl.style.color = '#7fc8ff';
+        lbl.textContent = (57 + i) + '번';
+        table.appendChild(lbl);
+    }
+
+    // ── 주기율표 본체에 란타/악티 자리 표시칸 ──
+    const lanPH = document.createElement('div');
+    lanPH.className = 'placeholder metal';
+    lanPH.style.gridColumn = '4';
+    lanPH.style.gridRow = '7';
+    lanPH.style.background = 'rgba(26,110,181,0.25)';
+    lanPH.innerHTML = '<span>57~71<br>란타넘족</span>';
+    table.appendChild(lanPH);
+
+    const actPH = document.createElement('div');
+    actPH.className = 'placeholder metal';
+    actPH.style.gridColumn = '4';
+    actPH.style.gridRow = '8';
+    actPH.style.background = 'rgba(26,110,181,0.25)';
+    actPH.innerHTML = '<span>89~103<br>악티늄족</span>';
+    table.appendChild(actPH);
+
+    // ── 원소 배치 ──
+    elements.forEach(el => {
+        const pos = getPos(el);
+        const div = document.createElement('div');
+        div.className = `element ${el.cat}`;
+
+        let rowNum;
+        if (typeof el.group === 'number') rowNum = el.period + 1;
+        else if (el.group === '란') rowNum = 11;
+        else rowNum = 12;
+
+        div.style.gridColumn = pos.col;
+        div.style.gridRow = rowNum;
+
+        const massStr = typeof el.mass === 'number'
+            ? (el.mass < 10 ? el.mass.toFixed(3) : el.mass < 100 ? el.mass.toFixed(2) : el.mass.toFixed(0))
+            : el.mass;
+
+        div.innerHTML = `
+            <span class="num">${el.z}</span>
+            <span class="sym">${el.sym}</span>
+            <span class="kor">${el.kr}</span>
+            <span class="mas">${massStr}</span>`;
+
+        div.addEventListener('click', () => openModal(el));
+        table.appendChild(div);
+    });
+}
+
+function groupLabel(el) {
+    if (typeof el.group === 'number') return el.group + '족';
+    if (el.group === '란') return '란타넘족 계열 (3족 위치)';
+    return '악티늄족 계열 (3족 위치)';
+}
+
+function openModal(el) {
+    document.getElementById('mSymBox').className = `modal-symbol-box ${el.cat}`;
+    document.getElementById('mNum').textContent = el.z;
+    document.getElementById('mSym').textContent = el.sym;
+    document.getElementById('mNameEn').textContent = el.en;
+    document.getElementById('mNameKr').textContent = el.kr;
+
+    const typeEl = document.getElementById('mType');
+    typeEl.textContent = catLabel[el.cat];
+    typeEl.className = `m-type ${catTypeClass[el.cat]}`;
+
+    document.getElementById('mMass').textContent = el.mass + ' u';
+    document.getElementById('mPG').textContent = `${el.period}주기 / ${groupLabel(el)}`;
+    document.getElementById('mConfig').textContent = el.config;
+    document.getElementById('mState').textContent = el.state;
+    document.getElementById('mBoil').textContent = el.boil === '-' ? '미확인' : el.boil + ' °C';
+    document.getElementById('mMelt').textContent = el.melt === '-' ? '미확인' : el.melt + ' °C';
+    document.getElementById('mEneg').textContent = el.eneg === '-' ? '미확인' : el.eneg;
+    document.getElementById('mYear').textContent = el.year;
+
+    document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal(e) {
+    if (e.target === document.getElementById('modalOverlay'))
+        document.getElementById('modalOverlay').classList.remove('active');
+}
+function closeModalBtn() {
+    document.getElementById('modalOverlay').classList.remove('active');
+}
+
+buildTable();
+</script>
+</body>
+</html>
